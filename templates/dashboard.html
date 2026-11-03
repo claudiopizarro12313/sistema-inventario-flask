@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Sistema de Inventario</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+
+    <div class="header">
+        <h2>Panel de Inventario y Ventas</h2>
+        <div>
+            <span>Bienvenido, <strong>{{ usuario }}</strong> ({{ rol }})</span>
+            <a href="/logout" class="btn btn-logout" style="margin-left: 10px;">Cerrar sesión</a>
+        </div>
+    </div>
+
+    <!-- MENSAJES FLASH DE FEEDBACK -->
+    <div style="margin-top: 15px;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <div class="container">
+        <!-- COLUMNA IZQUIERDA: FORMULARIOS -->
+        <div class="column">
+            
+            <!-- FORMULARIO DE REGISTRAR VENTA -->
+            <div class="card">
+                <h3 style="margin-top:0;">Registrar Venta</h3>
+                <form action="/procesar_venta" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="form-group">
+                        <label>Seleccionar Producto:</label>
+                        <select name="id_producto" required>
+                            <option value="" selected disabled>Seleccionar Producto...</option>
+                            {% for p in productos %}
+                                <option value="{{ p[0] }}">{{ p[2] }} (Stock: {{ p[4] }}) - ${{ "{:,.0f}".format(p[3]) }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Cantidad:</label>
+                        <input type="number" name="cantidad" min="1" value="1" required>
+                    </div>
+                    <button type="submit" class="btn btn-sell">Procesar Venta</button>
+                </form>
+            </div>
+
+            <!-- EXPORTAR CSV CON FILTRO DE FECHAS -->
+            <div class="card">
+                <h3 style="margin-top:0;">Reporte de Ventas</h3>
+                <form action="/reporte_ventas" method="GET">
+                    <div class="form-group">
+                        <label>Desde:</label>
+                        <input type="date" name="fecha_inicio">
+                    </div>
+                    <div class="form-group">
+                        <label>Hasta:</label>
+                        <input type="date" name="fecha_fin">
+                    </div>
+                    <button type="submit" class="btn btn-csv" style="width: 100%;">Descargar Reporte CSV</button>
+                </form>
+            </div>
+
+            <!-- AGREGAR / ACTUALIZAR PRODUCTO (Solo Admin) -->
+            {% if rol == 'Administrador' %}
+            <div class="card">
+                <h3 style="margin-top:0;">Agregar / Stockear Producto</h3>
+                <form action="/crear_producto" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <div class="form-group">
+                        <label>Código de Barras:</label>
+                        <input type="text" name="codigo" required placeholder="Si ya existe, se sumará el stock">
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre del Producto:</label>
+                        <input type="text" name="nombre" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Precio ($):</label>
+                        <input type="number" step="0.01" name="precio" required min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Stock a Añadir:</label>
+                        <input type="number" name="stock" required min="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Stock Mínimo (Alerta):</label>
+                        <input type="number" name="stock_minimo" value="5" required min="0">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Guardar Producto</button>
+                </form>
+            </div>
+            {% endif %}
+
+        </div>
+
+        <!-- TABLA DE PRODUCTOS Y SECCIONES -->
+        <div class="table-section">
+            <h3 style="margin-top:0;">Catálogo de Productos</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Nombre</th>
+                        <th>Precio</th>
+                        <th>Stock</th>
+                        <th>Estado</th>
+                        {% if rol == 'Administrador' %}<th>Acciones</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in productos %}
+                    <tr>
+                        <td>{{ p[1] }}</td>
+                        <td>{{ p[2] }}</td>
+                        <td>${{ "{:,.0f}".format(p[3]) }}</td>
+                        <td>{{ p[4] }}</td>
+                        <td>
+                            {% if p[4] <= p[5] %}
+                                <span class="badge-alert">¡Poco Stock!</span>
+                            {% else %}
+                                <span class="badge-ok">Normal</span>
+                            {% endif %}
+                        </td>
+                        {% if rol == 'Administrador' %}
+                        <td>
+                            <form action="{{ url_for('desactivar_producto', id_producto=p[0]) }}" method="POST" class="form-desactivar" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="btn-delete">Desactivar</button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center;">No hay productos registrados en la base de datos.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+</body>
+</html>
